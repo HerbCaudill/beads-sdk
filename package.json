@@ -1,0 +1,48 @@
+{
+  "name": "@herbcaudill/beads-sdk",
+  "version": "0.1.0",
+  "description": "Typed TypeScript SDK for the beads issue tracker",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "format": "prettier --write . --log-level silent"
+  },
+  "keywords": [
+    "beads",
+    "issue-tracker",
+    "sdk"
+  ],
+  "author": "Herb Caudill",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HerbCaudill/beads-sdk.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.9",
+    "prettier": "^3.5.3",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.17"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
