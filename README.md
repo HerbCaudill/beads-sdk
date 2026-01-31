@@ -1,7 +1,6 @@
 # @herbcaudill/beads-sdk
 
-Typed TypeScript SDK for the [beads](https://github.com/HerbCaudill/beads) issue tracker. Zero
-runtime dependencies.
+Typed TypeScript SDK for the [beads](https://github.com/HerbCaudill/beads) issue tracker. Zero runtime dependencies.
 
 ## Install
 
@@ -51,6 +50,35 @@ const blocked = await client.blocked()
 const enriched = await client.listWithParents({ status: "open" })
 ```
 
+### Search and ready work
+
+```ts
+// Text search with filters
+const results = await client.search({
+  query: "authentication",
+  status: "open",
+  sort: "priority",
+  limit: 10,
+})
+
+// Show ready work (open, unblocked)
+const ready = await client.ready({ assignee: "herb", limit: 5 })
+
+// Count issues, optionally grouped
+const total = await client.count({ status: "open" })
+const byType = await client.count({ byType: true })
+```
+
+### Reopen and children
+
+```ts
+// Reopen a closed issue
+await client.reopen("beads-001", "Not actually fixed")
+
+// List children of a parent/epic
+const children = await client.children("beads-000")
+```
+
 ### Labels and dependencies
 
 ```ts
@@ -61,6 +89,10 @@ const labels = await client.getLabels(issue.id)
 // issue B is blocked by issue A
 await client.addBlocker(issueB.id, issueA.id)
 await client.removeBlocker(issueB.id, issueA.id)
+
+// List dependencies or dependents
+const blockers = await client.listDeps(issue.id) // what blocks this issue
+const dependents = await client.listDeps(issue.id, { direction: "up" }) // what this issue blocks
 ```
 
 ### Comments
@@ -68,6 +100,20 @@ await client.removeBlocker(issueB.id, issueA.id)
 ```ts
 await client.addComment(issue.id, "Started working on this")
 const comments = await client.getComments(issue.id)
+```
+
+### Sync and epics
+
+```ts
+// Sync database with git
+await client.sync()
+await client.sync({ status: true }) // check sync state
+await client.sync({ full: true }) // full pull/merge/export/commit/push
+
+// Epic management
+const epics = await client.epicStatus()
+const eligible = await client.epicStatus(true) // only closeable epics
+await client.epicCloseEligible() // close all completed epics
 ```
 
 ### Watching for changes
