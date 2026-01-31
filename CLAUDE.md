@@ -1,40 +1,51 @@
-# Agent Instructions
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project overview
+
+Typed TypeScript SDK for the [beads](https://github.com/HerbCaudill/beads) issue tracker. Zero runtime
+dependencies. Requires `bd` CLI to be installed and available on PATH.
+
+## Commands
+
+```bash
+pnpm build          # Compile TypeScript to dist/
+pnpm dev            # Watch mode compilation
+pnpm typecheck      # Type-check without emitting
+pnpm test           # Run tests (vitest)
+pnpm test:watch     # Run tests in watch mode
+pnpm format         # Format with Prettier
+```
+
+## Architecture
+
+Three layers, all ESM:
+
+- **`exec.ts`** — Spawns `bd` CLI as a subprocess. All CRUD operations go through here.
+- **`socket.ts`** — Connects to the beads daemon via Unix socket (`.beads/bd.sock`) for real-time
+  mutation watching. JSON-RPC over newline-delimited messages.
+- **`BeadsClient.ts`** — High-level API combining both. CRUD methods shell out to `bd --json`;
+  `watchMutations` polls the daemon socket.
+
+`types.ts` holds all shared type definitions. `index.ts` is the barrel export.
+
+The daemon socket uses PascalCase keys (`Timestamp`, `Type`, `IssueID`) — this matches the Go
+daemon's JSON output and is intentional.
+
+## Testing
+
+Tests use Vitest. The `exec.ts` module accepts a custom `spawn` function via `ExecOptions` to
+enable testing without a real `bd` installation.
+
+## Issue tracking
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
-## Quick Reference
-
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+bd ready                                     # Find available work
+bd show <id>                                 # View issue details
+bd update <id> --status in_progress          # Claim work
+bd close <id>                                # Complete work
+bd sync                                      # Sync with git
 ```
-
-## Landing the Plane (Session Completion)
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-
