@@ -536,6 +536,266 @@ describe("BeadsClient", () => {
     })
   })
 
+  describe("reopen", () => {
+    it("reopens a single issue", async () => {
+      setup(JSON.stringify([sampleIssue]))
+      const issues = await client.reopen("beads-001")
+      expect(issues).toEqual([sampleIssue])
+      expect(getSpawnArgs(spawn)).toEqual(["reopen", "--json", "beads-001"])
+    })
+
+    it("reopens multiple issues", async () => {
+      setup(JSON.stringify([sampleIssue, sampleIssue]))
+      await client.reopen(["beads-001", "beads-002"])
+      expect(getSpawnArgs(spawn)).toEqual(["reopen", "--json", "beads-001", "beads-002"])
+    })
+
+    it("passes reason", async () => {
+      setup(JSON.stringify([sampleIssue]))
+      await client.reopen("beads-001", "Not actually fixed")
+      const args = getSpawnArgs(spawn)
+      expect(args).toContain("--reason")
+      expect(args).toContain("Not actually fixed")
+    })
+  })
+
+  describe("search", () => {
+    it("searches with query text", async () => {
+      setup(JSON.stringify([sampleIssue]))
+      const issues = await client.search({ query: "authentication" })
+      expect(issues).toEqual([sampleIssue])
+      expect(getSpawnArgs(spawn)).toEqual(["search", "--json", "authentication"])
+    })
+
+    it("passes all filter options", async () => {
+      setup("[]")
+      await client.search({
+        query: "bug",
+        status: "open",
+        type: "bug",
+        assignee: "herb",
+        labels: ["urgent"],
+        labelAny: ["frontend", "backend"],
+        limit: 10,
+        sort: "priority",
+        reverse: true,
+        priorityMin: 0,
+        priorityMax: 2,
+        createdAfter: "2024-01-01",
+        updatedBefore: "2024-12-31",
+      })
+      const args = getSpawnArgs(spawn)
+      expect(args).toContain("--status")
+      expect(args).toContain("open")
+      expect(args).toContain("--type")
+      expect(args).toContain("bug")
+      expect(args).toContain("--assignee")
+      expect(args).toContain("herb")
+      expect(args).toContain("--label")
+      expect(args).toContain("urgent")
+      expect(args).toContain("--label-any")
+      expect(args).toContain("frontend")
+      expect(args).toContain("--limit")
+      expect(args).toContain("10")
+      expect(args).toContain("--sort")
+      expect(args).toContain("priority")
+      expect(args).toContain("--reverse")
+      expect(args).toContain("--priority-min")
+      expect(args).toContain("0")
+      expect(args).toContain("--priority-max")
+      expect(args).toContain("2")
+      expect(args).toContain("--created-after")
+      expect(args).toContain("2024-01-01")
+      expect(args).toContain("--updated-before")
+      expect(args).toContain("2024-12-31")
+    })
+  })
+
+  describe("ready", () => {
+    it("returns ready issues with no options", async () => {
+      setup(JSON.stringify([sampleIssue]))
+      const issues = await client.ready()
+      expect(issues).toEqual([sampleIssue])
+      expect(getSpawnArgs(spawn)).toEqual(["ready", "--json"])
+    })
+
+    it("passes all filter options", async () => {
+      setup("[]")
+      await client.ready({
+        assignee: "herb",
+        labels: ["urgent"],
+        labelAny: ["frontend"],
+        limit: 5,
+        priority: 1,
+        type: "task",
+        unassigned: true,
+        sort: "priority",
+        parent: "beads-000",
+      })
+      const args = getSpawnArgs(spawn)
+      expect(args).toContain("--assignee")
+      expect(args).toContain("herb")
+      expect(args).toContain("--label")
+      expect(args).toContain("urgent")
+      expect(args).toContain("--label-any")
+      expect(args).toContain("frontend")
+      expect(args).toContain("--limit")
+      expect(args).toContain("5")
+      expect(args).toContain("--priority")
+      expect(args).toContain("1")
+      expect(args).toContain("--type")
+      expect(args).toContain("task")
+      expect(args).toContain("--unassigned")
+      expect(args).toContain("--sort")
+      expect(args).toContain("priority")
+      expect(args).toContain("--parent")
+      expect(args).toContain("beads-000")
+    })
+  })
+
+  describe("count", () => {
+    it("returns a simple count", async () => {
+      setup("42")
+      const result = await client.count()
+      expect(result).toBe(42)
+      expect(getSpawnArgs(spawn)).toEqual(["count", "--json"])
+    })
+
+    it("returns grouped counts", async () => {
+      const grouped = { open: 10, closed: 5, in_progress: 3 }
+      setup(JSON.stringify(grouped))
+      const result = await client.count({ byStatus: true })
+      expect(result).toEqual(grouped)
+      const args = getSpawnArgs(spawn)
+      expect(args).toContain("--by-status")
+    })
+
+    it("passes filter and grouping options", async () => {
+      setup("0")
+      await client.count({
+        status: "open",
+        type: "bug",
+        assignee: "herb",
+        priority: 1,
+        labels: ["urgent"],
+        byPriority: true,
+        byType: true,
+        byAssignee: true,
+        byLabel: true,
+      })
+      const args = getSpawnArgs(spawn)
+      expect(args).toContain("--status")
+      expect(args).toContain("--type")
+      expect(args).toContain("--assignee")
+      expect(args).toContain("--priority")
+      expect(args).toContain("--label")
+      expect(args).toContain("--by-priority")
+      expect(args).toContain("--by-type")
+      expect(args).toContain("--by-assignee")
+      expect(args).toContain("--by-label")
+    })
+  })
+
+  describe("children", () => {
+    it("returns children of a parent", async () => {
+      setup(JSON.stringify([sampleIssue]))
+      const issues = await client.children("beads-000")
+      expect(issues).toEqual([sampleIssue])
+      expect(getSpawnArgs(spawn)).toEqual(["children", "--json", "beads-000"])
+    })
+  })
+
+  describe("listDeps", () => {
+    it("lists dependencies with defaults", async () => {
+      setup(JSON.stringify([sampleIssue]))
+      const deps = await client.listDeps("beads-001")
+      expect(deps).toEqual([sampleIssue])
+      expect(getSpawnArgs(spawn)).toEqual(["dep", "list", "--json", "beads-001"])
+    })
+
+    it("passes direction and type", async () => {
+      setup("[]")
+      await client.listDeps("beads-001", { direction: "up", type: "blocks" })
+      const args = getSpawnArgs(spawn)
+      expect(args).toContain("--direction")
+      expect(args).toContain("up")
+      expect(args).toContain("--type")
+      expect(args).toContain("blocks")
+    })
+  })
+
+  describe("sync", () => {
+    it("runs sync with no options", async () => {
+      setup(JSON.stringify({ exported: 5 }))
+      const result = await client.sync()
+      expect(result).toEqual({ exported: 5 })
+      expect(getSpawnArgs(spawn)).toEqual(["sync", "--json"])
+    })
+
+    it("passes all sync options", async () => {
+      setup("{}")
+      await client.sync({
+        status: true,
+        force: true,
+        import: true,
+        dryRun: true,
+        noPush: true,
+        noPull: true,
+        full: true,
+      })
+      const args = getSpawnArgs(spawn)
+      expect(args).toContain("--status")
+      expect(args).toContain("--force")
+      expect(args).toContain("--import")
+      expect(args).toContain("--dry-run")
+      expect(args).toContain("--no-push")
+      expect(args).toContain("--no-pull")
+      expect(args).toContain("--full")
+    })
+  })
+
+  describe("epicStatus", () => {
+    it("returns epic completion status", async () => {
+      const epics = [
+        {
+          id: "beads-000",
+          title: "Epic 1",
+          total: 5,
+          closed: 3,
+          open: 2,
+          in_progress: 0,
+          completion: 60,
+          eligible_for_close: false,
+        },
+      ]
+      setup(JSON.stringify(epics))
+      const result = await client.epicStatus()
+      expect(result).toEqual(epics)
+      expect(getSpawnArgs(spawn)).toEqual(["epic", "status", "--json"])
+    })
+
+    it("passes eligible-only flag", async () => {
+      setup("[]")
+      await client.epicStatus(true)
+      expect(getSpawnArgs(spawn)).toEqual(["epic", "status", "--json", "--eligible-only"])
+    })
+  })
+
+  describe("epicCloseEligible", () => {
+    it("closes eligible epics", async () => {
+      setup(JSON.stringify([sampleIssue]))
+      const issues = await client.epicCloseEligible()
+      expect(issues).toEqual([sampleIssue])
+      expect(getSpawnArgs(spawn)).toEqual(["epic", "close-eligible", "--json"])
+    })
+
+    it("passes dry-run flag", async () => {
+      setup("[]")
+      await client.epicCloseEligible(true)
+      expect(getSpawnArgs(spawn)).toEqual(["epic", "close-eligible", "--json", "--dry-run"])
+    })
+  })
+
   describe("error handling", () => {
     it("rejects when bd exits with non-zero code", async () => {
       spawn = mockSpawnWithError("something went wrong", 1)

@@ -101,6 +101,145 @@ export interface BdDepResult {
   type?: string
 }
 
+/** Options for searching issues. */
+export interface BdSearchOptions {
+  /** Search query text */
+  query: string
+  /** Filter by status */
+  status?: IssueStatus
+  /** Filter by type */
+  type?: string
+  /** Filter by assignee */
+  assignee?: string
+  /** Filter by labels (AND: must have ALL) */
+  labels?: string[]
+  /** Filter by labels (OR: must have AT LEAST ONE) */
+  labelAny?: string[]
+  /** Maximum number of results (default: 50) */
+  limit?: number
+  /** Sort by field */
+  sort?:
+    | "priority"
+    | "created"
+    | "updated"
+    | "closed"
+    | "status"
+    | "id"
+    | "title"
+    | "type"
+    | "assignee"
+  /** Reverse sort order */
+  reverse?: boolean
+  /** Filter by minimum priority (inclusive, 0-4) */
+  priorityMin?: number
+  /** Filter by maximum priority (inclusive, 0-4) */
+  priorityMax?: number
+  /** Filter issues created after date (YYYY-MM-DD or RFC3339) */
+  createdAfter?: string
+  /** Filter issues created before date (YYYY-MM-DD or RFC3339) */
+  createdBefore?: string
+  /** Filter issues updated after date (YYYY-MM-DD or RFC3339) */
+  updatedAfter?: string
+  /** Filter issues updated before date (YYYY-MM-DD or RFC3339) */
+  updatedBefore?: string
+}
+
+/** Options for the ready command. */
+export interface BdReadyOptions {
+  /** Filter by assignee */
+  assignee?: string
+  /** Filter by labels (AND: must have ALL) */
+  labels?: string[]
+  /** Filter by labels (OR: must have AT LEAST ONE) */
+  labelAny?: string[]
+  /** Maximum issues to show (default: 10) */
+  limit?: number
+  /** Filter by priority (0-4) */
+  priority?: number
+  /** Filter by type */
+  type?: string
+  /** Show only unassigned issues */
+  unassigned?: boolean
+  /** Sort policy */
+  sort?: "hybrid" | "priority" | "oldest"
+  /** Filter to descendants of this parent */
+  parent?: string
+}
+
+/** Options for counting issues. */
+export interface BdCountOptions {
+  /** Filter by status */
+  status?: IssueStatus
+  /** Filter by type */
+  type?: string
+  /** Filter by assignee */
+  assignee?: string
+  /** Filter by priority (0-4) */
+  priority?: number
+  /** Filter by labels (AND: must have ALL) */
+  labels?: string[]
+  /** Group count by status */
+  byStatus?: boolean
+  /** Group count by priority */
+  byPriority?: boolean
+  /** Group count by type */
+  byType?: boolean
+  /** Group count by assignee */
+  byAssignee?: boolean
+  /** Group count by label */
+  byLabel?: boolean
+}
+
+/** Result of a count operation (simple or grouped). */
+export type BdCountResult = number | Record<string, number>
+
+/** Options for listing dependencies. */
+export interface BdDepListOptions {
+  /** Direction: 'down' (dependencies) or 'up' (dependents) */
+  direction?: "down" | "up"
+  /** Filter by dependency type */
+  type?: string
+}
+
+/** Options for the sync command. */
+export interface BdSyncOptions {
+  /** Show sync state without syncing */
+  status?: boolean
+  /** Force full export/import */
+  force?: boolean
+  /** Import from JSONL */
+  import?: boolean
+  /** Preview without making changes */
+  dryRun?: boolean
+  /** Skip pushing to remote */
+  noPush?: boolean
+  /** Skip pulling from remote */
+  noPull?: boolean
+  /** Full sync: pull -> merge -> export -> commit -> push */
+  full?: boolean
+}
+
+/** Result of a sync operation. */
+export interface BdSyncResult {
+  exported?: number
+  imported?: number
+  conflicts?: number
+  status?: string
+  [key: string]: unknown
+}
+
+/** Epic completion status. */
+export interface BdEpicStatus {
+  id: string
+  title: string
+  total: number
+  closed: number
+  open: number
+  in_progress: number
+  completion: number
+  eligible_for_close: boolean
+}
+
 /**  A comment on an issue. */
 export interface BdComment {
   id: number
