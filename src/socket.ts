@@ -33,13 +33,9 @@ export class DaemonSocket {
 
   /** Connect to the beads daemon. Returns true if connected, false otherwise. */
   async connect(): Promise<boolean> {
-    if (!this.socketExists()) {
-      return false
-    }
+    if (!this.socketExists()) return false
 
-    if (this.connected && this.socket) {
-      return true
-    }
+    if (this.connected && this.socket) return true
 
     return new Promise(resolve => {
       this.socket = createConnection(this.socketPath)
@@ -189,9 +185,7 @@ export function watchMutations(
       client = new DaemonSocket({ cwd })
       const connected = await client.connect()
       if (!connected) {
-        if (!stopped) {
-          timeoutId = setTimeout(poll, interval)
-        }
+        if (!stopped) timeoutId = setTimeout(poll, interval)
         return
       }
     }
@@ -202,18 +196,14 @@ export function watchMutations(
       for (const mutation of mutations) {
         onMutation(mutation)
         const mutationTime = new Date(mutation.Timestamp).getTime()
-        if (mutationTime > lastTimestamp) {
-          lastTimestamp = mutationTime
-        }
+        if (mutationTime > lastTimestamp) lastTimestamp = mutationTime
       }
     } catch {
       client?.close()
       client = null
     }
 
-    if (!stopped) {
-      timeoutId = setTimeout(poll, interval)
-    }
+    if (!stopped) timeoutId = setTimeout(poll, interval)
   }
 
   poll()
