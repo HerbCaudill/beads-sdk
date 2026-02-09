@@ -9,12 +9,16 @@ export interface BdIssue {
   status: IssueStatus
   priority: number
   issue_type: string
+  /** Person assigned to work on this issue */
+  assignee?: string
   owner?: string
   created_at: string
   created_by?: string
   updated_at: string
   closed_at?: string
   parent?: string
+  /** Labels attached to this issue */
+  labels?: string[]
   dependency_count?: number
   dependent_count?: number
   dependencies?: BdDependency[]

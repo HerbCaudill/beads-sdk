@@ -1,6 +1,6 @@
 {
   "name": "@herbcaudill/beads-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Typed TypeScript SDK for the beads issue tracker",
   "type": "module",
   "main": "./dist/index.js",
@@ -31,7 +31,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/HerbCaudill/beads-sdk.git"
+    "url": "git+https://github.com/HerbCaudill/beads-sdk.git"
   },
   "publishConfig": {
     "access": "public"
