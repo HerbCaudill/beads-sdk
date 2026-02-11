@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project overview
 
 Typed TypeScript SDK for the [beads](https://github.com/HerbCaudill/beads) issue tracker. Zero runtime
-dependencies. Requires `bd` CLI to be installed and available on PATH.
+dependencies. Connects directly to the beads daemon via Unix socket for fast operations (<20ms), with
+JSONL file fallback for read-only/offline scenarios.
 
 ## Commands
 
@@ -20,23 +21,42 @@ pnpm format         # Format with Prettier
 
 ## Architecture
 
-Three layers, all ESM:
+```
+React App <-> Backend API (localhost) <-> BeadsClient
+                                              |-- DaemonTransport  (Unix socket -> .beads/bd.sock)
+                                              |-- JsonlTransport   (fallback: parse .beads/issues.jsonl)
+```
 
-- **`exec.ts`** — Spawns `bd` CLI as a subprocess. All CRUD operations go through here.
-- **`socket.ts`** — Connects to the beads daemon via Unix socket (`.beads/bd.sock`) for real-time
-  mutation watching. JSON-RPC over newline-delimited messages.
-- **`BeadsClient.ts`** — High-level API combining both. CRUD methods shell out to `bd --json`;
-  `watchMutations` polls the daemon socket.
+Four layers, all ESM:
+
+- **`transport/daemon.ts`** — Sends JSON-RPC requests to the beads daemon via Unix socket. Each call
+  opens a fresh connection (matches the daemon's protocol). Auto-discovers socket by walking up from
+  workspace root. Auto-starts daemon if socket not found.
+- **`transport/jsonl.ts`** — Parses `.beads/issues.jsonl` into an in-memory `Map<string, Issue>`.
+  Supports read-only operations (list, show, ready, blocked, stats). Watches file via `fs.watch()`
+  and reloads on change. Used as fallback when daemon is unavailable.
+- **`transport/discovery.ts`** — Discovers `.beads/bd.sock` and `.beads/issues.jsonl` by walking up
+  the directory tree from the workspace root.
+- **`client.ts`** — High-level `BeadsClient` combining DaemonTransport + JsonlTransport. CRUD via
+  daemon; reads fall back to JSONL. Change detection via `ChangePoller` (polls daemon stats endpoint).
+- **`poller.ts`** — `ChangePoller` polls the daemon's `stats` endpoint on a configurable interval
+  and emits change events to subscribers.
 
 `types.ts` holds all shared type definitions. `index.ts` is the barrel export.
 
-The daemon socket uses PascalCase keys (`Timestamp`, `Type`, `IssueID`) — this matches the Go
-daemon's JSON output and is intentional.
+## Daemon Protocol
+
+Transport: Unix domain socket at `.beads/bd.sock`. Wire format: newline-delimited JSON. One request,
+one response, then socket closes.
+
+Operations: `ping`, `health`, `list`, `show`, `ready`, `blocked`, `stats`, `create`, `update`,
+`close`, `dep_add`.
 
 ## Testing
 
-Tests use Vitest. The `exec.ts` module accepts a custom `spawn` function via `ExecOptions` to
-enable testing without a real `bd` installation.
+Tests use Vitest. Tests for the JSONL transport and discovery module use temporary directories with
+real files. Tests for the poller use mock transports and fake timers. Client tests use the JSONL
+fallback path (no daemon required).
 
 ## Issue tracking
 

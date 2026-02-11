@@ -1,30 +1,33 @@
 export type {
-  IssueStatus,
-  BdIssue,
-  BdDependency,
-  BdListOptions,
-  BdCreateOptions,
-  BdUpdateOptions,
-  BdSearchOptions,
-  BdReadyOptions,
-  BdCountOptions,
-  BdCountResult,
-  BdDepListOptions,
-  BdSyncOptions,
-  BdSyncResult,
-  BdEpicStatus,
-  BdInfo,
-  BdLabelResult,
-  BdDepResult,
-  BdComment,
-  MutationType,
-  MutationEvent,
+  Status,
+  Priority,
+  IssueType,
+  DepType,
+  Issue,
+  LinkedIssue,
+  BlockedIssue,
+  StatsSummary,
+  RecentActivity,
+  Stats,
+  HealthStatus,
+  ListFilter,
+  ReadyFilter,
+  BlockedFilter,
+  CreateInput,
+  UpdateInput,
+  Transport,
+  RawJsonlDependency,
+  RawJsonlIssue,
 } from "./types.js"
 
-export { BeadsClient } from "./BeadsClient.js"
-export type { BeadsClientOptions } from "./BeadsClient.js"
+export { BeadsClient } from "./client.js"
+export type { BeadsClientOptions } from "./client.js"
 
-export { DaemonSocket, watchMutations } from "./socket.js"
-export type { DaemonSocketOptions, WatchMutationsOptions } from "./socket.js"
+export { DaemonTransport } from "./transport/daemon.js"
+export type { DaemonTransportOptions } from "./transport/daemon.js"
 
-export type { SpawnFn, ExecOptions } from "./exec.js"
+export { JsonlTransport } from "./transport/jsonl.js"
+
+export { findSocketPath, findJsonlPath, findBeadsDir } from "./transport/discovery.js"
+
+export { ChangePoller } from "./poller.js"
