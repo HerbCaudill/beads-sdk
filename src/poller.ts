@@ -2,13 +2,17 @@ import type { Transport } from "./types.js"
 
 /**
  * Polls the daemon's `stats` endpoint on a configurable interval
- * and emits change events when the data changes.
+ * and emits change events when the data changes. At most one poll
+ * request is in flight at any time; interval ticks that fire while
+ * a poll is running are skipped to prevent overlapping requests and
+ * out-of-order `lastHash` updates.
  */
 export class ChangePoller {
   private transport: Transport
   private intervalId: NodeJS.Timeout | null = null
   private callbacks: Array<() => void> = []
   private lastHash: string = ""
+  private polling: boolean = false
 
   constructor(
     /** Transport to poll through */
@@ -48,8 +52,10 @@ export class ChangePoller {
     }
   }
 
-  /** Check for changes by comparing stats hashes. */
+  /** Check for changes by comparing stats hashes. Skips if a poll is already in flight. */
   private async poll(): Promise<void> {
+    if (this.polling) return
+    this.polling = true
     try {
       const stats = await this.transport.send("stats", {})
       const hash = JSON.stringify(stats)
@@ -59,6 +65,8 @@ export class ChangePoller {
       this.lastHash = hash
     } catch {
       // Daemon might be temporarily unavailable; skip this cycle
+    } finally {
+      this.polling = false
     }
   }
 }

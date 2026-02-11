@@ -40,10 +40,41 @@ export class DaemonTransport implements Transport {
     return new Promise((resolve, reject) => {
       const socket = createConnection(socketPath)
       let responseData = ""
+      let settled = false
+
+      /** Settle the promise exactly once and clean up the timeout. */
+      const settle = (fn: typeof resolve | typeof reject, value: unknown) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        fn(value)
+      }
+
+      /** Parse a complete response string and settle the promise. */
+      const handleResponse = (raw: string) => {
+        const trimmed = raw.trim()
+        if (!trimmed) {
+          settle(
+            reject,
+            new Error("Daemon closed connection with empty response (EOF framing error)"),
+          )
+          return
+        }
+        try {
+          const response = JSON.parse(trimmed) as DaemonResponse
+          if (response.success) {
+            settle(resolve, response.data)
+          } else {
+            settle(reject, new Error(response.error ?? "Unknown daemon error"))
+          }
+        } catch {
+          settle(reject, new Error(`Failed to parse daemon response (framing error): ${trimmed}`))
+        }
+      }
 
       const timeout = setTimeout(() => {
         socket.destroy()
-        reject(new Error(`Daemon request timed out after ${this.requestTimeout}ms`))
+        settle(reject, new Error(`Daemon request timed out after ${this.requestTimeout}ms`))
       }, this.requestTimeout)
 
       socket.on("connect", () => {
@@ -58,26 +89,28 @@ export class DaemonTransport implements Transport {
 
       socket.on("data", (chunk: Buffer) => {
         responseData += chunk.toString()
+        // Parse eagerly when a newline delimiter arrives
         if (responseData.includes("\n")) {
-          clearTimeout(timeout)
           socket.destroy()
-          try {
-            const response = JSON.parse(responseData.trim()) as DaemonResponse
-            if (response.success) {
-              resolve(response.data)
-            } else {
-              reject(new Error(response.error ?? "Unknown daemon error"))
-            }
-          } catch (e) {
-            reject(new Error(`Failed to parse daemon response: ${responseData}`))
-          }
+          handleResponse(responseData)
+        }
+      })
+
+      socket.on("end", () => {
+        // Socket closed; parse any buffered data that arrived without a newline
+        if (!settled && responseData.length > 0) {
+          handleResponse(responseData)
+        } else if (!settled) {
+          settle(
+            reject,
+            new Error("Daemon closed connection with empty response (EOF framing error)"),
+          )
         }
       })
 
       socket.on("error", (err: Error) => {
-        clearTimeout(timeout)
         this.socketPath = null
-        reject(new Error(`Daemon connection error: ${err.message}`))
+        settle(reject, new Error(`Daemon connection error: ${err.message}`))
       })
     })
   }

@@ -40,14 +40,17 @@ Five modules, all ESM:
 - **`client.ts`** — High-level `BeadsClient` combining DaemonTransport + JsonlTransport. CRUD via
   daemon; reads fall back to JSONL. Change detection via `ChangePoller` (polls daemon stats endpoint).
 - **`poller.ts`** — `ChangePoller` polls the daemon's `stats` endpoint on a configurable interval
-  and emits change events to subscribers.
+  and emits change events to subscribers. Uses a `polling` guard flag to prevent overlapping
+  requests; interval ticks that fire while a poll is in flight are skipped.
 
 `types.ts` holds all shared type definitions. `index.ts` is the barrel export.
 
 ## Daemon Protocol
 
 Transport: Unix domain socket at `.beads/bd.sock`. Wire format: newline-delimited JSON. One request,
-one response, then socket closes.
+one response, then socket closes. The transport handles both newline-terminated and EOF-terminated
+responses; if the daemon closes the socket without a trailing newline, buffered data is parsed on
+the `end` event. Empty or malformed responses fail fast with a framing error instead of timing out.
 
 Operations: `ping`, `health`, `list`, `show`, `ready`, `blocked`, `stats`, `create`, `update`,
 `close`, `dep_add`.
@@ -55,8 +58,10 @@ Operations: `ping`, `health`, `list`, `show`, `ready`, `blocked`, `stats`, `crea
 ## Testing
 
 Tests use Vitest. Tests for the JSONL transport and discovery module use temporary directories with
-real files. Tests for the poller use mock transports and fake timers. Client tests use the JSONL
-fallback path (no daemon required).
+real files. Tests for the daemon transport use a mock Unix socket server to exercise response
+framing scenarios (newline-terminated, EOF-terminated, chunked, empty, malformed). Tests for the
+poller use mock transports and fake timers. Client tests use the JSONL fallback path (no daemon
+required).
 
 ## Issue tracking
 
