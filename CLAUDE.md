@@ -27,7 +27,7 @@ React App <-> Backend API (localhost) <-> BeadsClient
                                               |-- JsonlTransport   (fallback: parse .beads/issues.jsonl)
 ```
 
-Four layers, all ESM:
+Five modules, all ESM:
 
 - **`transport/daemon.ts`** — Sends JSON-RPC requests to the beads daemon via Unix socket. Each call
   opens a fresh connection (matches the daemon's protocol). Auto-discovers socket by walking up from

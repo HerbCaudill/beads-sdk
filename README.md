@@ -43,6 +43,11 @@ await client.disconnect()
 ```ts
 // Filter by status, priority, type, assignee, or labels
 const bugs = await client.list({ issue_type: "bug", status: "open" })
+const labeled = await client.list({ labels: ["frontend", "urgent"] }) // all required
+const any = await client.list({ labels_any: ["frontend", "backend"] }) // any match
+
+// Text search across title and description
+const results = await client.list({ query: "login" })
 
 // Get only ready issues (open and unblocked)
 const ready = await client.ready({ assignee: "herb", limit: 5 })
@@ -52,6 +57,19 @@ const blocked = await client.blocked()
 
 // Get database statistics
 const stats = await client.stats()
+```
+
+### Diagnostics
+
+```ts
+// Check connection status
+client.isConnected()
+
+// Ping the daemon
+const pong = await client.ping()
+
+// Get daemon health info
+const health = await client.health()
 ```
 
 ### Dependencies
