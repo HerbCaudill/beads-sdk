@@ -34,6 +34,9 @@ await client.update(issue.id, { status: "in_progress" })
 // Close an issue
 await client.close(issue.id)
 
+// Delete an issue
+await client.delete(issue.id)
+
 // Clean up
 await client.disconnect()
 ```
@@ -59,6 +62,54 @@ const blocked = await client.blocked()
 const stats = await client.stats()
 ```
 
+### Batch operations
+
+```ts
+// Show details for multiple issues (bounded concurrency)
+const issues = await client.showMany(["abc", "def", "ghi"])
+
+// Update multiple issues at once
+await client.updateMany(["abc", "def"], { status: "in_progress" })
+
+// Delete multiple issues
+await client.deleteMany(["abc", "def"])
+```
+
+### Comments
+
+```ts
+// Add a comment
+await client.addComment(issueId, "Looks good to me", "herb")
+
+// Get all comments for an issue
+const comments = await client.getComments(issueId)
+```
+
+### Labels
+
+```ts
+// Get labels for an issue
+const labels = await client.getLabels(issueId)
+
+// Add/remove labels
+await client.addLabel(issueId, "frontend")
+await client.removeLabel(issueId, "backend")
+
+// List all labels in the database
+const allLabels = await client.listAllLabels()
+```
+
+### Dependencies
+
+```ts
+// Add a dependency with explicit type
+await client.addDependency(childId, parentId, "blocks")
+
+// Convenience methods for blocking dependencies
+await client.addBlocker(blockedId, blockerId)
+await client.removeBlocker(blockedId, blockerId)
+```
+
 ### Diagnostics
 
 ```ts
@@ -70,13 +121,9 @@ const pong = await client.ping()
 
 // Get daemon health info
 const health = await client.health()
-```
 
-### Dependencies
-
-```ts
-// Add a blocking dependency
-await client.addDependency(childId, parentId, "blocks")
+// Get database info
+const info = await client.info()
 ```
 
 ### Watching for changes
@@ -90,6 +137,31 @@ const unsub = client.onChange(() => {
 
 // Later, stop watching
 unsub()
+```
+
+For detailed mutation events (create, update, delete, status changes):
+
+```ts
+import { watchMutations } from "@herbcaudill/beads-sdk"
+
+const stop = watchMutations(event => console.log(event.Type, event.IssueID), {
+  workspacePath: "/path/to/repo",
+  interval: 1000,
+})
+
+// Later, stop watching
+stop()
+```
+
+### Registry
+
+Discover available beads workspaces from the global registry:
+
+```ts
+import { getAliveWorkspaces } from "@herbcaudill/beads-sdk"
+
+// Get workspaces with live daemon processes
+const workspaces = getAliveWorkspaces("/current/repo")
 ```
 
 ### Configuration
@@ -128,11 +200,13 @@ BeadsClient
   |-- DaemonTransport  (Unix socket -> .beads/bd.sock)
   |-- JsonlTransport   (fallback: parse .beads/issues.jsonl)
   |-- ChangePoller     (polls stats for change detection)
+  |-- MutationPoller   (polls get_mutations for detailed events)
 ```
 
 - **DaemonTransport**: Connects to the beads daemon via Unix socket. Each RPC call opens a fresh connection. Auto-discovers socket by walking up from workspace root. Auto-starts daemon if not running.
 - **JsonlTransport**: Read-only fallback. Parses `.beads/issues.jsonl` into memory. Watches the file for changes via `fs.watch()`.
 - **ChangePoller**: Polls the daemon's `stats` endpoint and emits change events when data changes.
+- **MutationPoller**: Polls the daemon's `get_mutations` endpoint and emits detailed mutation events with type, issue ID, and status changes.
 
 ## License
 

@@ -27,7 +27,7 @@ React App <-> Backend API (localhost) <-> BeadsClient
                                               |-- JsonlTransport   (fallback: parse .beads/issues.jsonl)
 ```
 
-Five modules, all ESM:
+Eight modules, all ESM:
 
 - **`transport/daemon.ts`** — Sends JSON-RPC requests to the beads daemon via Unix socket. Each call
   opens a fresh connection (matches the daemon's protocol). Auto-discovers socket by walking up from
@@ -37,11 +37,19 @@ Five modules, all ESM:
   and reloads on change. Used as fallback when daemon is unavailable.
 - **`transport/discovery.ts`** — Discovers `.beads/bd.sock` and `.beads/issues.jsonl` by walking up
   the directory tree from the workspace root.
-- **`client.ts`** — High-level `BeadsClient` combining DaemonTransport + JsonlTransport. CRUD via
-  daemon; reads fall back to JSONL. Change detection via `ChangePoller` (polls daemon stats endpoint).
+- **`client.ts`** — High-level `BeadsClient` combining DaemonTransport + JsonlTransport. Full CRUD
+  plus comments, labels, and dependencies via daemon; reads fall back to JSONL. Change detection via
+  `ChangePoller` (polls daemon stats endpoint). Exports `watchMutations` convenience function.
 - **`poller.ts`** — `ChangePoller` polls the daemon's `stats` endpoint on a configurable interval
   and emits change events to subscribers. Uses a `polling` guard flag to prevent overlapping
   requests; interval ticks that fire while a poll is in flight are skipped.
+- **`mutation-poller.ts`** — `MutationPoller` polls the daemon's `get_mutations` endpoint and emits
+  detailed mutation events (type, issue ID, status changes), unlike ChangePoller which only signals
+  that something changed.
+- **`batch.ts`** — `batched()` utility for running async operations with bounded concurrency
+  (default 10). Used by `showMany`, `updateMany`, `deleteMany` on the client.
+- **`registry.ts`** — Reads the global beads registry (`~/.beads/registry.json`) to discover
+  available workspaces and check daemon process liveness.
 
 `types.ts` holds all shared type definitions. `index.ts` is the barrel export.
 
@@ -53,7 +61,8 @@ responses; if the daemon closes the socket without a trailing newline, buffered 
 the `end` event. Empty or malformed responses fail fast with a framing error instead of timing out.
 
 Operations: `ping`, `health`, `list`, `show`, `ready`, `blocked`, `stats`, `create`, `update`,
-`close`, `dep_add`.
+`close`, `delete`, `dep_add`, `dep_remove`, `comment_add`, `comments`, `label_add`, `label_remove`,
+`label_list`, `label_list_all`, `info`, `get_mutations`.
 
 ## Testing
 
