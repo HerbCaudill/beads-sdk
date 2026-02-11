@@ -389,6 +389,205 @@ describe("JsonlTransport", () => {
       expect(parent.dependents).toHaveLength(1)
       expect(parent.dependents[0].id).toBe("bd-child")
     })
+
+    it("computes fallback dependency_count for linked issues when raw field is missing", async () => {
+      // bd-a depends on bd-b and bd-c (two dependencies)
+      // bd-b has no explicit dependency_count or dependent_count fields
+      writeFileSync(
+        jsonlPath,
+        [
+          makeIssue({
+            id: "bd-a",
+            title: "A",
+            dependencies: [
+              {
+                issue_id: "bd-a",
+                depends_on_id: "bd-b",
+                type: "blocks",
+                created_at: "2025-01-01T00:00:00Z",
+              },
+              {
+                issue_id: "bd-a",
+                depends_on_id: "bd-c",
+                type: "blocks",
+                created_at: "2025-01-01T00:00:00Z",
+              },
+            ],
+            // omit dependency_count — should fall back to dependencies.length = 2
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+          makeIssue({
+            id: "bd-b",
+            title: "B",
+            dependencies: [
+              {
+                issue_id: "bd-b",
+                depends_on_id: "bd-c",
+                type: "related",
+                created_at: "2025-01-01T00:00:00Z",
+              },
+            ],
+            // omit both counts — should compute fallback
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+          makeIssue({
+            id: "bd-c",
+            title: "C",
+            // omit counts
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+        ]
+          .map(i => JSON.stringify(i))
+          .join("\n"),
+      )
+
+      const transport = new JsonlTransport(tempDir)
+      transport.load()
+
+      // Top-level issue bd-b should compute fallback counts
+      const topB = (await transport.send("show", { id: "bd-b" })) as Issue
+      expect(topB.dependency_count).toBe(1) // bd-b depends on bd-c
+      expect(topB.dependent_count).toBe(1) // bd-a depends on bd-b
+
+      // Now check bd-b as a linked issue (dependency) in bd-a's show response
+      const issueA = (await transport.send("show", { id: "bd-a" })) as Issue
+      const linkedB = issueA.dependencies.find(d => d.id === "bd-b")!
+      expect(linkedB).toBeDefined()
+      // Should match the top-level computed counts, not default to 0
+      expect(linkedB.dependency_count).toBe(1)
+      expect(linkedB.dependent_count).toBe(1)
+    })
+
+    it("computes fallback dependent_count for dependent entries when raw field is missing", async () => {
+      // bd-child depends on bd-parent — so bd-parent's dependents include bd-child
+      // bd-child also depends on bd-other
+      writeFileSync(
+        jsonlPath,
+        [
+          makeIssue({
+            id: "bd-parent",
+            title: "Parent",
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+          makeIssue({
+            id: "bd-child",
+            title: "Child",
+            dependencies: [
+              {
+                issue_id: "bd-child",
+                depends_on_id: "bd-parent",
+                type: "parent-child",
+                created_at: "2025-01-01T00:00:00Z",
+              },
+              {
+                issue_id: "bd-child",
+                depends_on_id: "bd-other",
+                type: "blocks",
+                created_at: "2025-01-01T00:00:00Z",
+              },
+            ],
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+          makeIssue({
+            id: "bd-other",
+            title: "Other",
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+        ]
+          .map(i => JSON.stringify(i))
+          .join("\n"),
+      )
+
+      const transport = new JsonlTransport(tempDir)
+      transport.load()
+
+      // Top-level bd-child should have dependency_count=2, dependent_count=0
+      const topChild = (await transport.send("show", { id: "bd-child" })) as Issue
+      expect(topChild.dependency_count).toBe(2)
+      expect(topChild.dependent_count).toBe(0)
+
+      // bd-child as a dependent entry on bd-parent's show response
+      const parent = (await transport.send("show", { id: "bd-parent" })) as Issue
+      const depChild = parent.dependents.find(d => d.id === "bd-child")!
+      expect(depChild).toBeDefined()
+      // Should match the top-level computed counts, not default to 0
+      expect(depChild.dependency_count).toBe(2)
+      expect(depChild.dependent_count).toBe(0)
+    })
+
+    it("returns consistent counts between top-level and linked views", async () => {
+      // A chain: bd-1 -> bd-2 -> bd-3, all without raw count fields
+      writeFileSync(
+        jsonlPath,
+        [
+          makeIssue({
+            id: "bd-1",
+            title: "First",
+            dependencies: [
+              {
+                issue_id: "bd-1",
+                depends_on_id: "bd-2",
+                type: "blocks",
+                created_at: "2025-01-01T00:00:00Z",
+              },
+            ],
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+          makeIssue({
+            id: "bd-2",
+            title: "Second",
+            dependencies: [
+              {
+                issue_id: "bd-2",
+                depends_on_id: "bd-3",
+                type: "blocks",
+                created_at: "2025-01-01T00:00:00Z",
+              },
+            ],
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+          makeIssue({
+            id: "bd-3",
+            title: "Third",
+            dependency_count: undefined,
+            dependent_count: undefined,
+          }),
+        ]
+          .map(i => JSON.stringify(i))
+          .join("\n"),
+      )
+
+      const transport = new JsonlTransport(tempDir)
+      transport.load()
+
+      // Get top-level views of all three
+      const top1 = (await transport.send("show", { id: "bd-1" })) as Issue
+      const top2 = (await transport.send("show", { id: "bd-2" })) as Issue
+      const top3 = (await transport.send("show", { id: "bd-3" })) as Issue
+
+      // bd-2 as linked in bd-1's dependencies
+      const linked2 = top1.dependencies.find(d => d.id === "bd-2")!
+      expect(linked2.dependency_count).toBe(top2.dependency_count)
+      expect(linked2.dependent_count).toBe(top2.dependent_count)
+
+      // bd-1 as dependent in bd-2's dependents
+      const dep1 = top2.dependents.find(d => d.id === "bd-1")!
+      expect(dep1.dependency_count).toBe(top1.dependency_count)
+      expect(dep1.dependent_count).toBe(top1.dependent_count)
+
+      // bd-2 as dependent in bd-3's dependents
+      const dep2 = top3.dependents.find(d => d.id === "bd-2")!
+      expect(dep2.dependency_count).toBe(top2.dependency_count)
+      expect(dep2.dependent_count).toBe(top2.dependent_count)
+    })
   })
 
   describe("close", () => {

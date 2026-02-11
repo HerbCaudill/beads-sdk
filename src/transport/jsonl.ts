@@ -328,8 +328,8 @@ export class JsonlTransport implements Transport {
         updated_at: target.updated_at,
         closed_at: target.closed_at,
         dependency_type: dep.type as LinkedIssue["dependency_type"],
-        dependency_count: target.dependency_count ?? 0,
-        dependent_count: target.dependent_count ?? 0,
+        dependency_count: target.dependency_count ?? (target.dependencies ?? []).length,
+        dependent_count: target.dependent_count ?? this.countDependents(target.id),
       })
     }
     return linked
@@ -354,8 +354,8 @@ export class JsonlTransport implements Transport {
             updated_at: raw.updated_at,
             closed_at: raw.closed_at,
             dependency_type: dep.type as LinkedIssue["dependency_type"],
-            dependency_count: raw.dependency_count ?? 0,
-            dependent_count: raw.dependent_count ?? 0,
+            dependency_count: raw.dependency_count ?? (raw.dependencies ?? []).length,
+            dependent_count: raw.dependent_count ?? this.countDependents(raw.id),
           })
         }
       }
