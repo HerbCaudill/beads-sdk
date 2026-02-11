@@ -288,8 +288,8 @@ export class BeadsClient {
     /** Issue ID */
     id: string,
   ): Promise<Comment[]> {
-    this.requireDaemon("comments")
-    return (await this.send("comments", { id })) as Comment[]
+    this.requireDaemon("comment_list")
+    return (await this.send("comment_list", { id })) as Comment[]
   }
 
   // ── Labels ───────────────────────────────────────────────────────
