@@ -234,6 +234,129 @@ describe("BeadsClient", () => {
     })
   })
 
+  describe("connect idempotency", () => {
+    it("cleans up previous JSONL transport on repeated connect", async () => {
+      writeFileSync(jsonlPath, JSON.stringify(makeIssue()))
+      const client = new BeadsClient()
+
+      await client.connect(tempDir)
+
+      // Spy on JsonlTransport.prototype.close to detect cleanup
+      const { JsonlTransport } = await import("../transport/jsonl.js")
+      const closeSpy = vi.spyOn(JsonlTransport.prototype, "close")
+
+      // Second connect should close the previous transport
+      await client.connect(tempDir)
+      expect(closeSpy).toHaveBeenCalledTimes(1)
+
+      // Client should still work after reconnect
+      expect(client.isConnected()).toBe(true)
+      const issues = await client.list()
+      expect(issues).toHaveLength(1)
+
+      closeSpy.mockRestore()
+      await client.disconnect()
+    })
+
+    it("does not duplicate onChange notifications after repeated connect", async () => {
+      // This test verifies the core bug: calling connect() N times should not
+      // cause notifyChange() to fire N times per data change, because each
+      // connect() wires up a new internal subscription without removing the old one.
+      writeFileSync(jsonlPath, JSON.stringify(makeIssue()))
+      const client = new BeadsClient()
+
+      await client.connect(tempDir)
+      const callback = vi.fn()
+      client.onChange(callback)
+
+      // Reconnect multiple times
+      await client.connect(tempDir)
+      await client.connect(tempDir)
+      await client.connect(tempDir)
+
+      // Trigger a JSONL file change to fire onChange
+      writeFileSync(
+        jsonlPath,
+        [makeIssue({ id: "bd-1" }), makeIssue({ id: "bd-2" })]
+          .map(i => JSON.stringify(i))
+          .join("\n"),
+      )
+
+      // Wait for fs.watch to fire
+      await new Promise(r => setTimeout(r, 300))
+
+      // Callback should fire at most once per change, not 4 times (once per connect)
+      expect(callback.mock.calls.length).toBeLessThanOrEqual(1)
+
+      await client.disconnect()
+    })
+
+    it("preserves onChange subscribers across reconnect", async () => {
+      writeFileSync(jsonlPath, JSON.stringify(makeIssue()))
+      const client = new BeadsClient()
+
+      await client.connect(tempDir)
+      const callback = vi.fn()
+      client.onChange(callback)
+
+      // Reconnect — should not clear external onChange subscribers
+      await client.connect(tempDir)
+
+      // Verify the subscriber is still registered by accessing internals
+      const callbacks = (client as unknown as { changeCallbacks: Array<() => void> })
+        .changeCallbacks
+      expect(callbacks).toContain(callback)
+
+      // Verify unsubscribe still works after reconnect
+      const unsub = client.onChange(vi.fn())
+      expect(callbacks).toHaveLength(2)
+      unsub()
+      expect(callbacks).toHaveLength(1)
+      expect(callbacks).toContain(callback)
+
+      await client.disconnect()
+    })
+
+    it("cleans up on each reconnect, not just the last", async () => {
+      writeFileSync(jsonlPath, JSON.stringify(makeIssue()))
+      const client = new BeadsClient()
+
+      const { JsonlTransport } = await import("../transport/jsonl.js")
+      const closeSpy = vi.spyOn(JsonlTransport.prototype, "close")
+
+      await client.connect(tempDir)
+      await client.connect(tempDir)
+      await client.connect(tempDir)
+
+      // Each reconnect after the first should have cleaned up the previous transport
+      expect(closeSpy).toHaveBeenCalledTimes(2)
+
+      await client.disconnect()
+      // disconnect should close the last one too
+      expect(closeSpy).toHaveBeenCalledTimes(3)
+
+      closeSpy.mockRestore()
+    })
+
+    it("works correctly after multiple reconnects", async () => {
+      writeFileSync(jsonlPath, JSON.stringify(makeIssue({ id: "bd-1" })))
+      const client = new BeadsClient()
+
+      // Connect 5 times in sequence
+      for (let i = 0; i < 5; i++) {
+        await client.connect(tempDir)
+      }
+
+      // Should still function normally
+      expect(client.isConnected()).toBe(true)
+      const issues = await client.list()
+      expect(issues).toHaveLength(1)
+      expect(issues[0].id).toBe("bd-1")
+
+      await client.disconnect()
+    })
+  })
+
   describe("not connected", () => {
     it("throws when calling methods before connect", async () => {
       const client = new BeadsClient()

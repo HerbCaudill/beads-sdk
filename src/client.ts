@@ -47,11 +47,15 @@ export class BeadsClient {
   /**
    * Connect to the daemon at the given workspace root.
    * Tries the daemon first; falls back to JSONL for read-only access.
+   * Idempotent: cleans up previous connections before reconnecting.
    */
   async connect(
     /** Path to the workspace root (directory containing or above `.beads/`) */
     workspaceRoot: string,
   ): Promise<void> {
+    // Clean up any previous connection to prevent leaked pollers/watchers
+    this.cleanupResources()
+
     this.workspaceRoot = workspaceRoot
 
     // Try daemon first
@@ -96,15 +100,7 @@ export class BeadsClient {
 
   /** Disconnect and clean up all resources. */
   async disconnect(): Promise<void> {
-    this.poller?.stop()
-    this.poller = null
-    this.jsonlUnsubscribe?.()
-    this.jsonlUnsubscribe = null
-    this.daemon?.close()
-    this.daemon = null
-    this.jsonl?.close()
-    this.jsonl = null
-    this.transport = null
+    this.cleanupResources()
     this.connected = false
     this.changeCallbacks = []
   }
@@ -383,6 +379,19 @@ export class BeadsClient {
   }
 
   // ── Internals ────────────────────────────────────────────────────
+
+  /** Release internal transport resources (poller, watcher, subscriptions). */
+  private cleanupResources(): void {
+    this.poller?.stop()
+    this.poller = null
+    this.jsonlUnsubscribe?.()
+    this.jsonlUnsubscribe = null
+    this.daemon?.close()
+    this.daemon = null
+    this.jsonl?.close()
+    this.jsonl = null
+    this.transport = null
+  }
 
   /** Send an operation through the active transport. */
   private async send(
